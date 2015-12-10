@@ -26,15 +26,65 @@ This document will contain information about the use of Splunk.
 
 - When entering a site, the `ou=` value will be contained within the `cs_uri_stem=` URL for navbars and pages, and these elements will NOT have a `cs_uri_query=` field. On the other hand widgets will have a `cs_uri_query=` and an `ou=` field which contain the sites `ou=` value.
 
-
-
 ## Field description
+- `cs` in any field stands for client-to-server action.
+
+- `sc` in any field stands for server-to-client action.
+
+- `time=` is self evident and should always be included in any query. This will help determine the sequence of events.
+
+- `date=` is self evident and should always be included in any query. This will help determine the sequence of events.
+
+- `c_ip=` specifies an ip address, client ip. This will be helpful when trying to identify the stream of a single individual but will need to changed to de-identify the data.
+
+- `s_ip=` specifies an ip address, server ip.
+
+- `sourcetype=` specifies the input file format of the log file, 'iis' the most common sourcetype in the d2l logs stands for Internet Information Systems.
+
 - `cs_uri_stem=` specifies the URL actually used by the client.
 
 - `ou=` specifies a unique identityer for the different d2l sites.
 
 ## Important values
+- `cs_uri_stem=`
+  - `/d2l/activityFeed/checkForNewAlerts`, is a log based on the idleness of a user. This is returned every two minutes and records an automatic page refresh submission.
+  - `/d2l/lp/ouHome/home.d2l`, is a log that is submitted when one clicks on a course site link from the D2L homepage.
+  - `/d2l/home/XXXXXX` specifies the homepage of a site, the x's is the ou value for a the site.
+  - `/d2l/common/viewContentFile.d2lfile` specifies page content that is loaded upon an individual entering a site.
+  Logs that contain this value will also have a `cs_uri_query=` field that identifies the object being loaded. For instance many of these are loaded in ITCH, one for each staff profile.
+  - `/d2l/lp/navbars/*` specifies navigation bars that are loaded within a page upon loading the page.
+  - `/d2l/le/content/XXXXXX/viewContent/YYYYYYY/View` specifies looking at content within site X and the content has a unique identifyer of Y. This is logged before a log that specifies the page title within the `cs_uri_query=`, but which has a generic `/d2l/common/viewContentFile.d2lfile`.
+  - `/d2l/lms/news/main.d2l` indicates that someone has accessed the news section of the site.
+  - `/d2l/lms/discussions/ajax/ajaxFunctions.d2lfile` indicates accessing a discussion board.
+
+
+- `cs_uri_query=`
+  - Within this string files that are considered resources will include a section in their directory called 'resource-working-files/', this will be followed by the names of the file, e.g. 'My+Portfolio.html'. These files will also begin with the string '/content'.
+  `/content/enforced/267060-PS_128-0510-Ongoing/resource-working-files/Computer+and+Library+Resources.html`
+  - `/content/enforced/267060-PS_128-0510-Ongoing/resource-working-files/Profiles.html`, the section at the end 'Profiles.html' seems to indicate if someone has clicked on the read more button for the news widget.
+
+- `ou=267060&postId=2072899&topicId=293697` when an individual goes into a discussion topic it will provide the following log, which indicates the postId and topicId. These numbers describe a unique identifier for each post.
+
+
+
+## Course site ou
+- Information Technology Course Hub = 267060
+
+
 
 ## Common Queries
+- To identify all indiviuals who have accessed the IT Course Hub we can use the following code which reads `search for ITCH site | group records by username | return username from each grouped record`.
+> cs_uri_stem=/d2l/home/267060 | transaction cs_username | table cs_username
 
+- Alternative, to find all logs within d2l that have been produced by users who have visited the IT course hub we do, `search for logs in d2l that include [all individuals who have accessed the IT Course Hub]`
+> cs_uri_stem=/d2l* [search cs_uri_stem=/d2l/home/267060 | transaction cs_username | table cs_username]
+
+- To get a count of the number of visits for each hour by each user. If you remove the 'date_hour' argument it will give a count of each users visits over the time specified:
+>cs_uri_stem=/d2l/home/267060 | stats count by cs_username, date_hour
+
+- This search returns all logs with username 'card' that don't include fields with the values expressed in the brackets.
 >cs_username=card NOT (cs_uri_stem=/d2l/activityFeed/checkForNewAlerts OR cs_uri_stem=/d2l/lp* OR cs_uri_stem=/d2l/common* OR  cs_uri_stem=/Shibboleth* OR cs_uri_stem=/d2l/shibboleth*)
+
+- To identify all users using a course site and then search all of their D2L use, see http://answers.splunk.com/answers/121489/extract-user-list-and-use-in-next-query.html
+
+- Search for all users who accessed the homepage `cs_unsername="*" cs_uri_stem=/d2l/home/XXXXXX`
